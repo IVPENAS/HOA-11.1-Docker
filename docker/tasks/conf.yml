@@ -1,0 +1,44 @@
+- name: Creating a Directory for the configuration of Dockerfile
+  file:
+    path: /home/penas/docker_config
+    state: directory
+
+- name: Copying the Dockerfile
+  copy:
+    src: Dockerfile
+    dest: /home/penas/docker_config
+    owner: penas
+    group: penas
+
+- name: Creating Volume
+  file:
+    path: /home/penas/pages
+    state: directory
+
+- name: Building Image
+  community.docker.docker_image:
+    name: lamp-penas
+    tag: "1.0"
+    build:
+      path: /home/penas/docker_config
+    source: build
+
+- name: Deploying Container
+  community.docker.docker_container:
+    name: lamp-penas
+    image: lamp-penas:1.0
+    state: started
+    exposed_ports:
+      - "80"
+    ports:
+      - "8080:80"
+    volumes:
+      - /home/penas/pages:/var/www/html
+
+- block:
+  - name: Confirmation if lamp-userver container is running
+    shell: docker ps
+    register: container_status
+
+  - debug:
+      msg="{{ container_status }}"

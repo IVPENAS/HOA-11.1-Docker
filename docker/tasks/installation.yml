@@ -1,0 +1,91 @@
+- name: Uninstalling the old Docker versions
+  apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+
+- name: Creating a directory for the new-packages
+  file:
+    path: /home/penas/docker-deb
+    state: directory
+
+- name: Downloading Docker Components using External Link
+  get_url:
+    url: "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/{{ item }}"
+    dest: /home/penas/docker-deb
+  with_items:
+    - "{{ docker_apps.containerd }}.deb"
+    - "{{ docker_apps.docker_ce_cli }}.deb"
+    - "{{ docker_apps.docker_ce }}.deb"
+    - "{{ docker_apps.docker_compose }}.deb"
+
+- name: Installation of Docker components
+  shell: |
+    cd /home/penas/docker-deb
+    dpkg -i "{{ item }}"
+  with_items:
+    - "{{ docker_apps.containerd }}.deb"
+    - "{{ docker_apps.docker_ce_cli }}.deb"
+    - "{{ docker_apps.docker_ce }}.deb"
+    - "{{ docker_apps.docker_compose }}.deb"
+
+- name: Fixing /var/run/docker.sock error
+  shell: chmod 666 /var/run/docker.sock
+
+- name: Confirming the group docker is present
+  group:
+    name: docker
+    state: present
+
+- name: Adding Docker to the group of the current user
+  user:
+    name: userver
+    groups: docker
+    append: yes
+
+- name: Enabling Docker services
+  service:
+    name: "{{ item }}"
+    state: started
+  with_items:
+    - docker
+    - containerd
+
+- name: Installing python3
+  apt:
+    name: python3-pip
+
+- name: Installing Python3 sdk
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name:
+      - docker
+      - docker-compose
+
+- block:
+  - name: Verifying docker service
+    shell: systemctl list-unit-files | grep docker
+    register: docker_service
+
+  - debug:
+      msg="{{ docker_service }}"
+
+- block:
+  - name: Verifying user groups
+    shell: groups userver
+    register: user_groups
+
+  - debug:
+      msg="{{ user_groups }}"
+
+- block:
+  - name: Verifying docker installation
+    shell: docker --version
+    register: docker_installation
+
+  - debug:
+      msg="{{ docker_installation }}"
